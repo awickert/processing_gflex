@@ -1,0 +1,19 @@
+[general]
+name=gFlex
+qgisMinimumVersion=3.16
+description=Lithospheric flexural isostasy via gFlex
+version=0.1.0
+author=Andy Wickert
+email=awickert@umn.edu
+about=Exposes the gFlex lithospheric flexure model as QGIS Processing algorithms.
+      Computes 2-D flexural deflection of the lithosphere under surface loads
+      using finite difference, spectral (FFT), or analytical (SAS) methods.
+      Requires gFlex >= 2.0.0 (pip install gflex).
+tracker=https://github.com/awickert/processing_gflex/issues
+repository=https://github.com/awickert/processing_gflex
+tags=geophysics, flexure, isostasy, raster, lithosphere
+homepage=https://github.com/awickert/processing_gflex
+category=Raster
+experimental=True
+deprecated=False
+hasProcessingProvider=yes
