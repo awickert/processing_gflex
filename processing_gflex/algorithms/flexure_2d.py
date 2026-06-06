@@ -72,8 +72,8 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterString(
                 self.INPUT_TE,
-                'Elastic thickness [m or km] — number or raster layer name',
-                defaultValue='35000',
+                'Elastic thickness — number or raster layer name',
+                defaultValue='35',
             )
         )
         self.addParameter(
@@ -81,7 +81,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                 self.TE_UNITS,
                 'Elastic thickness units',
                 options=['m', 'km'],
-                defaultValue=0,
+                defaultValue=1,  # km
             )
         )
 
@@ -113,11 +113,11 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
 
         # ── Material properties (advanced) ────────────────────────────────────
         for param_key, label, default in [
-            (self.PARAM_G,       'Gravitational acceleration g [m/s²]',    9.8),
-            (self.PARAM_E,       "Young's modulus E [Pa]",                 65e9),
-            (self.PARAM_NU,      "Poisson's ratio ν",                      0.25),
-            (self.PARAM_RHO_M,   'Mantle density ρ_m [kg/m³]',            3300.0),
-            (self.PARAM_RHO_FILL,'Infill density ρ_fill [kg/m³] (0 = air)', 0.0),
+            (self.PARAM_G,       'Gravitational acceleration [m/s²]',   9.8),
+            (self.PARAM_E,       "Young's modulus [Pa]",                 65e9),
+            (self.PARAM_NU,      "Poisson's ratio",                      0.25),
+            (self.PARAM_RHO_M,   'Mantle density [kg/m³]',              3300.0),
+            (self.PARAM_RHO_FILL,'Infill density [kg/m³] (0 = air)',    0.0),
         ]:
             p = QgsProcessingParameterNumber(
                 param_key,
