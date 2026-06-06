@@ -10,6 +10,8 @@ from qgis.core import (
     QgsProcessingParameterNumber,
     QgsProcessingParameterRasterDestination,
     QgsProcessingParameterRasterLayer,
+    QgsProcessingParameterString,
+    QgsProcessingUtils,
 )
 
 # gFlex v2 alias strings for boundary conditions
@@ -34,8 +36,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
 
     INPUT_LOAD = 'INPUT_LOAD'
     LOAD_DENSITY = 'LOAD_DENSITY'
-    INPUT_TE_RASTER = 'INPUT_TE_RASTER'
-    INPUT_TE_SCALAR = 'INPUT_TE_SCALAR'
+    INPUT_TE = 'INPUT_TE'
     TE_UNITS = 'TE_UNITS'
     METHOD = 'METHOD'
     BC_NORTH = 'BC_NORTH'
@@ -69,19 +70,10 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
 
         # ── Elastic thickness ─────────────────────────────────────────────────
         self.addParameter(
-            QgsProcessingParameterRasterLayer(
-                self.INPUT_TE_RASTER,
-                'Elastic thickness raster (overrides scalar Te; FD only)',
-                optional=True,
-            )
-        )
-        self.addParameter(
-            QgsProcessingParameterNumber(
-                self.INPUT_TE_SCALAR,
-                'Elastic thickness — scalar value',
-                type=QgsProcessingParameterNumber.Double,
-                defaultValue=35000.0,
-                minValue=0.0,
+            QgsProcessingParameterString(
+                self.INPUT_TE,
+                'Elastic thickness — scalar value or raster layer name',
+                defaultValue='35000',
             )
         )
         self.addParameter(
@@ -121,11 +113,11 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
 
         # ── Material properties (advanced) ────────────────────────────────────
         for param_key, label, default in [
-            (self.PARAM_G,       'Gravitational acceleration [m/s²]', 9.8),
-            (self.PARAM_E,       "Young's modulus [Pa]",              65e9),
-            (self.PARAM_NU,      "Poisson's ratio",                   0.25),
-            (self.PARAM_RHO_M,   'Mantle density [kg/m³]',           3300.0),
-            (self.PARAM_RHO_FILL,'Infill density [kg/m³] (0 = air)', 0.0),
+            (self.PARAM_G,       'Gravitational acceleration g [m/s²]',    9.8),
+            (self.PARAM_E,       "Young's modulus E [Pa]",                 65e9),
+            (self.PARAM_NU,      "Poisson's ratio ν",                      0.25),
+            (self.PARAM_RHO_M,   'Mantle density ρ_m [kg/m³]',            3300.0),
+            (self.PARAM_RHO_FILL,'Infill density ρ_fill [kg/m³] (0 = air)', 0.0),
         ]:
             p = QgsProcessingParameterNumber(
                 param_key,
@@ -193,8 +185,17 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         te_units_idx = self.parameterAsEnum(parameters, self.TE_UNITS, context)
         te_scale     = 1000.0 if te_units_idx == 1 else 1.0  # km → m
 
-        te_layer = self.parameterAsRasterLayer(parameters, self.INPUT_TE_RASTER, context)
-        if te_layer is not None:
+        te_str = self.parameterAsString(parameters, self.INPUT_TE, context).strip()
+        try:
+            T_e = float(te_str) * te_scale
+        except ValueError:
+            # Not a number — try to resolve as a raster layer name or path
+            te_layer = QgsProcessingUtils.mapLayerFromString(te_str, context)
+            if te_layer is None:
+                raise QgsProcessingException(
+                    f'Elastic thickness "{te_str}" is neither a valid number '
+                    'nor a recognised raster layer name.'
+                )
             te_ds   = gdal.Open(te_layer.source())
             te_band = te_ds.GetRasterBand(1)
             te_raw  = te_band.ReadAsArray().astype(float)
@@ -203,8 +204,6 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             if te_nodata is not None:
                 T_e[np.isclose(te_raw, te_nodata)] = 0.0
             te_ds = None
-        else:
-            T_e = self.parameterAsDouble(parameters, self.INPUT_TE_SCALAR, context) * te_scale
 
         # ── Grid spacing [m] ──────────────────────────────────────────────────
         # geotransform: (x_min, dx, 0, y_max, 0, -dy)  (dy is negative)
@@ -308,7 +307,8 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             '(<i>rho_load · g · h</i>). Set <b>Load density</b> &gt; 0 to have the '
             'plugin compute the stress from a thickness raster [m].</p>'
             '<h3>Elastic thickness</h3>'
-            '<p>Supply either a <b>Te raster</b> (FD only) or a <b>scalar Te</b>. '
+            '<p>Enter a <b>number</b> (e.g. <code>35000</code>) for uniform Te, '
+            'or a <b>raster layer name</b> for spatially variable Te (FD only). '
             'Select units (m or km).</p>'
             '<h3>Methods</h3>'
             '<ul>'
