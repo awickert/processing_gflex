@@ -27,8 +27,13 @@ _BC_LABELS = [
 _METHOD_KEYS = ['fd', 'fft', 'sas']
 _METHOD_LABELS = [
     'Finite difference (FD) — variable or scalar Te, user-specified BCs',
-    'Spectral / FFT — scalar Te only, periodic BCs',
+    'Spectral / FFT — scalar Te only',
     'Superposition of analytical solutions (SAS) — scalar Te only',
+]
+
+_FFT_BC_LABELS = [
+    'Periodic — domain wraps around',
+    'No outside loads — zero-pad domain, then trim (recommended)',
 ]
 
 
@@ -39,6 +44,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
     INPUT_TE = 'INPUT_TE'
     TE_UNITS = 'TE_UNITS'
     METHOD = 'METHOD'
+    BC_FFT = 'BC_FFT'
     BC_NORTH = 'BC_NORTH'
     BC_SOUTH = 'BC_SOUTH'
     BC_WEST = 'BC_WEST'
@@ -95,12 +101,22 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-        # ── Boundary conditions (FD only) ─────────────────────────────────────
+        # ── FFT boundary condition ────────────────────────────────────────────
+        self.addParameter(
+            QgsProcessingParameterEnum(
+                self.BC_FFT,
+                'FFT boundaries',
+                options=_FFT_BC_LABELS,
+                defaultValue=1,  # no outside loads
+            )
+        )
+
+        # ── FD boundary conditions ────────────────────────────────────────────
         for param_key, label in [
-            (self.BC_NORTH, 'North BC (FD only)'),
-            (self.BC_SOUTH, 'South BC (FD only)'),
-            (self.BC_WEST,  'West BC (FD only)'),
-            (self.BC_EAST,  'East BC (FD only)'),
+            (self.BC_NORTH, 'FD boundary — North'),
+            (self.BC_SOUTH, 'FD boundary — South'),
+            (self.BC_WEST,  'FD boundary — West'),
+            (self.BC_EAST,  'FD boundary — East'),
         ]:
             self.addParameter(
                 QgsProcessingParameterEnum(
@@ -249,14 +265,58 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         flex.rho_m  = self.parameterAsDouble(parameters, self.PARAM_RHO_M,   context)
         flex.rho_fill = self.parameterAsDouble(parameters, self.PARAM_RHO_FILL, context)
 
+        # ── Boundary conditions and optional padding ──────────────────────────
+        fd_bc_indices = [
+            self.parameterAsEnum(parameters, k, context)
+            for k in (self.BC_NORTH, self.BC_SOUTH, self.BC_WEST, self.BC_EAST)
+        ]
+        fd_bcs_nondefault = any(i != 0 for i in fd_bc_indices)
+
+        pad_width = 0
         if method == 'fd':
-            flex.bc_north = _BC_KEYS[self.parameterAsEnum(parameters, self.BC_NORTH, context)]
-            flex.bc_south = _BC_KEYS[self.parameterAsEnum(parameters, self.BC_SOUTH, context)]
-            flex.bc_west  = _BC_KEYS[self.parameterAsEnum(parameters, self.BC_WEST,  context)]
-            flex.bc_east  = _BC_KEYS[self.parameterAsEnum(parameters, self.BC_EAST,  context)]
+            flex.bc_north = _BC_KEYS[fd_bc_indices[0]]
+            flex.bc_south = _BC_KEYS[fd_bc_indices[1]]
+            flex.bc_west  = _BC_KEYS[fd_bc_indices[2]]
+            flex.bc_east  = _BC_KEYS[fd_bc_indices[3]]
+            fft_bc_idx = self.parameterAsEnum(parameters, self.BC_FFT, context)
+            if fft_bc_idx != 1:  # non-default FFT BC selected but method is FD
+                feedback.pushWarning(
+                    'FFT boundaries setting is ignored when using the FD method.'
+                )
         elif method == 'fft':
+            if fd_bcs_nondefault:
+                feedback.pushWarning(
+                    'FD boundary conditions are ignored for the FFT method.'
+                )
+            fft_bc_idx = self.parameterAsEnum(parameters, self.BC_FFT, context)
+            if fft_bc_idx == 1:  # no outside loads — zero-pad domain
+                flex.T_e, qs_padded, pad_width = gflex.pad_domain(
+                    flex.T_e,
+                    np.array(flex.qs),
+                    flex.dx,
+                    dy=flex.dy,
+                    E=flex.E,
+                    nu=flex.nu,
+                    rho_m=flex.rho_m,
+                    rho_fill=flex.rho_fill,
+                    g=flex.g,
+                )
+                flex.qs = qs_padded
+                feedback.pushInfo(
+                    f'Domain zero-padded by {pad_width} cells on each side '
+                    'to approximate no-outside-loads boundary.'
+                )
             flex.bc_north = flex.bc_south = flex.bc_west = flex.bc_east = 'periodic'
-        # SAS: no BCs needed (gFlex uses no_outside_loads implicitly)
+        else:  # SAS
+            if fd_bcs_nondefault:
+                feedback.pushWarning(
+                    'FD boundary conditions are ignored for the SAS method.'
+                )
+            fft_bc_idx = self.parameterAsEnum(parameters, self.BC_FFT, context)
+            if fft_bc_idx != 1:
+                feedback.pushWarning(
+                    'FFT boundaries setting is ignored for the SAS method.'
+                )
 
         # ── Solve ─────────────────────────────────────────────────────────────
         feedback.pushInfo('Computing flexural deflections…')
@@ -268,6 +328,8 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             flex.finalize()
         for warninfo in caught:
             feedback.pushWarning(str(warninfo.message))
+        if pad_width > 0:
+            w = w[pad_width:-pad_width, pad_width:-pad_width]
         feedback.pushInfo('Done.')
 
         # ── Write output raster ───────────────────────────────────────────────
@@ -312,14 +374,22 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             'Select units (m or km).</p>'
             '<h3>Methods</h3>'
             '<ul>'
-            '<li><b>FD</b> — finite difference; supports variable Te and all '
-            'boundary conditions.</li>'
-            '<li><b>FFT</b> — spectral; scalar Te only, periodic boundary.</li>'
-            '<li><b>SAS</b> — superposition of analytical solutions; scalar Te only.</li>'
+            '<li><b>FD</b> — finite difference; supports variable or scalar Te '
+            'and user-specified boundary conditions on each edge.</li>'
+            '<li><b>FFT</b> — spectral; scalar Te only. Choose <i>Periodic</i> '
+            '(domain wraps) or <i>No outside loads</i> (domain is zero-padded by '
+            'one flexural wavelength and then trimmed — recommended for most uses).</li>'
+            '<li><b>SAS</b> — superposition of analytical solutions; scalar Te only; '
+            'no boundary condition needed.</li>'
             '</ul>'
-            '<h3>Boundary conditions (FD only)</h3>'
-            '<p>Free (broken plate), Clamped, Pinned, Mirror, or Periodic '
-            'for each of the four edges.</p>'
+            '<h3>FFT boundaries</h3>'
+            '<p>All four edges are set together. <i>No outside loads</i> pads the '
+            'domain with zeros, solves on the enlarged grid, and trims the output '
+            'back to the original extent — the fastest way to approximate an '
+            'infinite plate for a constant-Te problem.</p>'
+            '<h3>FD boundary conditions</h3>'
+            '<p>Free (broken plate), Clamped, Pinned, Mirror, or Periodic, '
+            'set independently for each edge.</p>'
             '<h3>Requirements</h3>'
             '<p>gFlex &ge; 2.0.0: <code>pip install gflex</code></p>'
         )
