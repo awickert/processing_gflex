@@ -14,6 +14,7 @@ repository=https://github.com/awickert/processing_gflex
 tags=geophysics, flexure, isostasy, raster, lithosphere
 homepage=https://github.com/awickert/processing_gflex
 category=Raster
+icon=processing_gflex/icons/icon.png
 experimental=True
 deprecated=False
 hasProcessingProvider=yes
