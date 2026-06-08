@@ -15,9 +15,9 @@ from qgis.core import (
 )
 
 # gFlex v2 BC alias strings — valid for FD edges.
-# 'no_outside_loads' is also accepted by FD: gFlex auto-pads that side,
+# 'infinite' (alias for 'no_outside_loads'): gFlex auto-pads that side,
 # solves on the extended domain, and crops w back transparently.
-_BC_KEYS = ['free', 'clamped', 'pinned', 'mirror', 'periodic', 'no_outside_loads']
+_BC_KEYS = ['free', 'clamped', 'pinned', 'mirror', 'periodic', 'infinite']
 _BC_LABELS = [
     'Free / broken plate',
     'Clamped',
@@ -36,7 +36,7 @@ _METHOD_LABELS = [
 
 # FFT BCs are per opposite-edge pair (W/E independent of N/S).
 # 'periodic' → that axis wraps exactly; anything else → gFlex zero-pads that axis.
-_FFT_AXIS_KEYS = ['no_outside_loads', 'periodic']
+_FFT_AXIS_KEYS = ['infinite', 'periodic']
 _FFT_AXIS_LABELS = [
     'Infinite plate — zero-pad this axis (recommended)',
     'Periodic — domain wraps along this axis',
@@ -285,7 +285,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
 
         fft_ew = _FFT_AXIS_KEYS[self.parameterAsEnum(parameters, self.BC_FFT_EW, context)]
         fft_ns = _FFT_AXIS_KEYS[self.parameterAsEnum(parameters, self.BC_FFT_NS, context)]
-        fft_bcs_nondefault = (fft_ew != 'no_outside_loads') or (fft_ns != 'no_outside_loads')
+        fft_bcs_nondefault = (fft_ew != 'infinite') or (fft_ns != 'infinite')
 
         if method == 'fd':
             flex.bc_north = _BC_KEYS[fd_bc_indices[0]]
