@@ -77,7 +77,7 @@ flex.finalize()
 | `"zero_moment_zero_shear"` | `"free"` | FD | Broken plate / free end |
 | `"zero_slope_zero_shear"` | `"mirror"` | FD | Mirror symmetry plane |
 | `"periodic"` | — | FD, FFT | Wrap-around |
-| `"no_outside_loads"` | — | FD, FFT, SAS | Infinite plate, no far-field loads |
+| `"no_outside_loads"` | `"infinite"` | FD, FFT, SAS | Infinite plate, no far-field loads |
 
 **`no_outside_loads` behaviour by method:**
 - **FD**: set on any subset of edges; gFlex auto-pads those sides by one flexural wavelength, applies clamped BC at the new outer edge, solves, and crops `w` back to the original shape. Output shape is transparent to the caller. Mixed BCs are supported (e.g. `no_outside_loads` on two sides, `free` on the others).
