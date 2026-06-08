@@ -14,14 +14,17 @@ from qgis.core import (
     QgsProcessingUtils,
 )
 
-# gFlex v2 alias strings for boundary conditions
-_BC_KEYS = ['free', 'clamped', 'pinned', 'mirror', 'periodic']
+# gFlex v2 BC alias strings — valid for FD edges.
+# 'no_outside_loads' is also accepted by FD: gFlex auto-pads that side,
+# solves on the extended domain, and crops w back transparently.
+_BC_KEYS = ['free', 'clamped', 'pinned', 'mirror', 'periodic', 'no_outside_loads']
 _BC_LABELS = [
     'Free / broken plate',
     'Clamped',
     'Pinned (simply supported)',
     'Mirror symmetry',
     'Periodic',
+    'No outside loads (auto-pad this edge)',
 ]
 
 _METHOD_KEYS = ['fd', 'fft', 'sas']
@@ -31,30 +34,34 @@ _METHOD_LABELS = [
     'Superposition of analytical solutions (SAS) — scalar Te only',
 ]
 
-_FFT_BC_LABELS = [
-    'Periodic — domain wraps around',
-    'No outside loads — zero-pad domain, then trim (recommended)',
+# FFT BCs are per opposite-edge pair (W/E independent of N/S).
+# 'periodic' → that axis wraps exactly; anything else → gFlex zero-pads that axis.
+_FFT_AXIS_KEYS = ['no_outside_loads', 'periodic']
+_FFT_AXIS_LABELS = [
+    'No outside loads — zero-pad this axis (recommended)',
+    'Periodic — domain wraps along this axis',
 ]
 
 
 class Flexure2DAlgorithm(QgsProcessingAlgorithm):
 
-    INPUT_LOAD = 'INPUT_LOAD'
+    INPUT_LOAD   = 'INPUT_LOAD'
     LOAD_DENSITY = 'LOAD_DENSITY'
-    INPUT_TE = 'INPUT_TE'
-    TE_UNITS = 'TE_UNITS'
-    METHOD = 'METHOD'
-    BC_FFT = 'BC_FFT'
-    BC_NORTH = 'BC_NORTH'
-    BC_SOUTH = 'BC_SOUTH'
-    BC_WEST = 'BC_WEST'
-    BC_EAST = 'BC_EAST'
-    PARAM_G = 'PARAM_G'
-    PARAM_E = 'PARAM_E'
-    PARAM_NU = 'PARAM_NU'
-    PARAM_RHO_M = 'PARAM_RHO_M'
+    INPUT_TE     = 'INPUT_TE'
+    TE_UNITS     = 'TE_UNITS'
+    METHOD       = 'METHOD'
+    BC_FFT_EW    = 'BC_FFT_EW'
+    BC_FFT_NS    = 'BC_FFT_NS'
+    BC_NORTH     = 'BC_NORTH'
+    BC_SOUTH     = 'BC_SOUTH'
+    BC_WEST      = 'BC_WEST'
+    BC_EAST      = 'BC_EAST'
+    PARAM_G      = 'PARAM_G'
+    PARAM_E      = 'PARAM_E'
+    PARAM_NU     = 'PARAM_NU'
+    PARAM_RHO_M  = 'PARAM_RHO_M'
     PARAM_RHO_FILL = 'PARAM_RHO_FILL'
-    OUTPUT = 'OUTPUT'
+    OUTPUT       = 'OUTPUT'
 
     def initAlgorithm(self, config=None):
         # ── Load ──────────────────────────────────────────────────────────────
@@ -101,17 +108,21 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-        # ── FFT boundary condition ────────────────────────────────────────────
-        self.addParameter(
-            QgsProcessingParameterEnum(
-                self.BC_FFT,
-                'FFT boundaries',
-                options=_FFT_BC_LABELS,
-                defaultValue=1,  # no outside loads
+        # ── FFT boundary conditions (per opposite-edge pair) ──────────────────
+        for param_key, label in [
+            (self.BC_FFT_EW, 'FFT boundary — West/East'),
+            (self.BC_FFT_NS, 'FFT boundary — North/South'),
+        ]:
+            self.addParameter(
+                QgsProcessingParameterEnum(
+                    param_key,
+                    label,
+                    options=_FFT_AXIS_LABELS,
+                    defaultValue=0,  # no outside loads
+                )
             )
-        )
 
-        # ── FD boundary conditions ────────────────────────────────────────────
+        # ── FD boundary conditions (one per edge) ─────────────────────────────
         for param_key, label in [
             (self.BC_NORTH, 'FD boundary — North'),
             (self.BC_SOUTH, 'FD boundary — South'),
@@ -129,11 +140,11 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
 
         # ── Material properties (advanced) ────────────────────────────────────
         for param_key, label, default in [
-            (self.PARAM_G,       'Gravitational acceleration [m/s²]',   9.8),
-            (self.PARAM_E,       "Young's modulus [Pa]",                 65e9),
-            (self.PARAM_NU,      "Poisson's ratio",                      0.25),
-            (self.PARAM_RHO_M,   'Mantle density [kg/m³]',              3300.0),
-            (self.PARAM_RHO_FILL,'Infill density [kg/m³] (0 = air)',    0.0),
+            (self.PARAM_G,       'Gravitational acceleration [m/s²]',    9.8),
+            (self.PARAM_E,       "Young's modulus [Pa]",                  65e9),
+            (self.PARAM_NU,      "Poisson's ratio",                       0.25),
+            (self.PARAM_RHO_M,   'Mantle density [kg/m³]',               3300.0),
+            (self.PARAM_RHO_FILL,'Infill density [kg/m³] (0 = air)',     0.0),
         ]:
             p = QgsProcessingParameterNumber(
                 param_key,
@@ -185,8 +196,8 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         cols = load_ds.RasterXSize
         rows = load_ds.RasterYSize
 
-        load_band  = load_ds.GetRasterBand(1)
-        load_array = load_band.ReadAsArray().astype(float)
+        load_band   = load_ds.GetRasterBand(1)
+        load_array  = load_band.ReadAsArray().astype(float)
         load_nodata = load_band.GetNoDataValue()
         if load_nodata is not None:
             load_array[np.isclose(load_array, load_nodata)] = 0.0
@@ -212,9 +223,9 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                     f'Elastic thickness "{te_str}" is neither a valid number '
                     'nor a recognised raster layer name.'
                 )
-            te_ds   = gdal.Open(te_layer.source())
-            te_band = te_ds.GetRasterBand(1)
-            te_raw  = te_band.ReadAsArray().astype(float)
+            te_ds     = gdal.Open(te_layer.source())
+            te_band   = te_ds.GetRasterBand(1)
+            te_raw    = te_band.ReadAsArray().astype(float)
             te_nodata = te_band.GetNoDataValue()
             T_e = te_raw * te_scale
             if te_nodata is not None:
@@ -241,81 +252,68 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         else:
             dx, dy = dx_raw, dy_raw
 
-        # ── Method ───────────────────────────────────────────────────────────
+        # ── Method ────────────────────────────────────────────────────────────
         method_idx = self.parameterAsEnum(parameters, self.METHOD, context)
         method     = _METHOD_KEYS[method_idx]
 
         if method in ('fft', 'sas') and not np.isscalar(T_e):
             raise QgsProcessingException(
                 f'Method "{method}" requires a scalar elastic thickness. '
-                'Either switch to FD or remove the Te raster and set a scalar value.'
+                'Either switch to FD or enter a number for Te.'
             )
 
-        # ── Assemble gFlex object ────────────────────────────────────────────
+        # ── Assemble gFlex object ─────────────────────────────────────────────
         flex = gflex.F2D()
-        flex.quiet  = True
-        flex.method = method
-        flex.qs     = qs
-        flex.T_e    = T_e
-        flex.dx     = dx
-        flex.dy     = dy
-        flex.g      = g
-        flex.E      = self.parameterAsDouble(parameters, self.PARAM_E,       context)
-        flex.nu     = self.parameterAsDouble(parameters, self.PARAM_NU,      context)
-        flex.rho_m  = self.parameterAsDouble(parameters, self.PARAM_RHO_M,   context)
+        flex.quiet    = True
+        flex.method   = method
+        flex.qs       = qs
+        flex.T_e      = T_e
+        flex.dx       = dx
+        flex.dy       = dy
+        flex.g        = g
+        flex.E        = self.parameterAsDouble(parameters, self.PARAM_E,       context)
+        flex.nu       = self.parameterAsDouble(parameters, self.PARAM_NU,      context)
+        flex.rho_m    = self.parameterAsDouble(parameters, self.PARAM_RHO_M,   context)
         flex.rho_fill = self.parameterAsDouble(parameters, self.PARAM_RHO_FILL, context)
 
-        # ── Boundary conditions and optional padding ──────────────────────────
+        # ── Boundary conditions ───────────────────────────────────────────────
         fd_bc_indices = [
             self.parameterAsEnum(parameters, k, context)
             for k in (self.BC_NORTH, self.BC_SOUTH, self.BC_WEST, self.BC_EAST)
         ]
         fd_bcs_nondefault = any(i != 0 for i in fd_bc_indices)
 
-        pad_width = 0
+        fft_ew = _FFT_AXIS_KEYS[self.parameterAsEnum(parameters, self.BC_FFT_EW, context)]
+        fft_ns = _FFT_AXIS_KEYS[self.parameterAsEnum(parameters, self.BC_FFT_NS, context)]
+        fft_bcs_nondefault = (fft_ew != 'no_outside_loads') or (fft_ns != 'no_outside_loads')
+
         if method == 'fd':
             flex.bc_north = _BC_KEYS[fd_bc_indices[0]]
             flex.bc_south = _BC_KEYS[fd_bc_indices[1]]
             flex.bc_west  = _BC_KEYS[fd_bc_indices[2]]
             flex.bc_east  = _BC_KEYS[fd_bc_indices[3]]
-            fft_bc_idx = self.parameterAsEnum(parameters, self.BC_FFT, context)
-            if fft_bc_idx != 1:  # non-default FFT BC selected but method is FD
+            if fft_bcs_nondefault:
                 feedback.pushWarning(
-                    'FFT boundaries setting is ignored when using the FD method.'
+                    'FFT boundary settings are ignored when using the FD method.'
                 )
         elif method == 'fft':
+            # Set each axis-pair independently; gFlex pads any non-periodic axis.
+            if fft_ew == 'periodic':
+                flex.bc_west = flex.bc_east = 'periodic'
+            if fft_ns == 'periodic':
+                flex.bc_north = flex.bc_south = 'periodic'
             if fd_bcs_nondefault:
                 feedback.pushWarning(
                     'FD boundary conditions are ignored for the FFT method.'
                 )
-            fft_bc_idx = self.parameterAsEnum(parameters, self.BC_FFT, context)
-            if fft_bc_idx == 1:  # no outside loads — zero-pad domain
-                flex.T_e, qs_padded, pad_width = gflex.pad_domain(
-                    flex.T_e,
-                    np.array(flex.qs),
-                    flex.dx,
-                    dy=flex.dy,
-                    E=flex.E,
-                    nu=flex.nu,
-                    rho_m=flex.rho_m,
-                    rho_fill=flex.rho_fill,
-                    g=flex.g,
-                )
-                flex.qs = qs_padded
-                feedback.pushInfo(
-                    f'Domain zero-padded by {pad_width} cells on each side '
-                    'to approximate no-outside-loads boundary.'
-                )
-            flex.bc_north = flex.bc_south = flex.bc_west = flex.bc_east = 'periodic'
         else:  # SAS
             if fd_bcs_nondefault:
                 feedback.pushWarning(
                     'FD boundary conditions are ignored for the SAS method.'
                 )
-            fft_bc_idx = self.parameterAsEnum(parameters, self.BC_FFT, context)
-            if fft_bc_idx != 1:
+            if fft_bcs_nondefault:
                 feedback.pushWarning(
-                    'FFT boundaries setting is ignored for the SAS method.'
+                    'FFT boundary settings are ignored for the SAS method.'
                 )
 
         # ── Solve ─────────────────────────────────────────────────────────────
@@ -328,8 +326,6 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             flex.finalize()
         for warninfo in caught:
             feedback.pushWarning(str(warninfo.message))
-        if pad_width > 0:
-            w = w[pad_width:-pad_width, pad_width:-pad_width]
         feedback.pushInfo('Done.')
 
         # ── Write output raster ───────────────────────────────────────────────
@@ -369,27 +365,29 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             '(<i>rho_load · g · h</i>). Set <b>Load density</b> &gt; 0 to have the '
             'plugin compute the stress from a thickness raster [m].</p>'
             '<h3>Elastic thickness</h3>'
-            '<p>Enter a <b>number</b> (e.g. <code>35000</code>) for uniform Te, '
+            '<p>Enter a <b>number</b> (e.g. <code>35</code> km) for uniform Te, '
             'or a <b>raster layer name</b> for spatially variable Te (FD only). '
             'Select units (m or km).</p>'
             '<h3>Methods</h3>'
             '<ul>'
             '<li><b>FD</b> — finite difference; supports variable or scalar Te '
-            'and user-specified boundary conditions on each edge.</li>'
-            '<li><b>FFT</b> — spectral; scalar Te only. Choose <i>Periodic</i> '
-            '(domain wraps) or <i>No outside loads</i> (domain is zero-padded by '
-            'one flexural wavelength and then trimmed — recommended for most uses).</li>'
+            'and independent boundary conditions on each edge.</li>'
+            '<li><b>FFT</b> — spectral; scalar Te only. Per-axis boundary control: '
+            'set West/East and North/South pairs independently to <i>Periodic</i> '
+            'or <i>No outside loads</i>.</li>'
             '<li><b>SAS</b> — superposition of analytical solutions; scalar Te only; '
             'no boundary condition needed.</li>'
             '</ul>'
             '<h3>FFT boundaries</h3>'
-            '<p>All four edges are set together. <i>No outside loads</i> pads the '
-            'domain with zeros, solves on the enlarged grid, and trims the output '
-            'back to the original extent — the fastest way to approximate an '
-            'infinite plate for a constant-Te problem.</p>'
+            '<p>West/East and North/South are controlled independently. '
+            '<i>No outside loads</i> (recommended): gFlex zero-pads that axis '
+            'internally and trims the output back to the original extent. '
+            '<i>Periodic</i>: the domain wraps exactly along that axis. '
+            'Mixed configurations (e.g. x-periodic, y-padded) are valid.</p>'
             '<h3>FD boundary conditions</h3>'
-            '<p>Free (broken plate), Clamped, Pinned, Mirror, or Periodic, '
-            'set independently for each edge.</p>'
+            '<p>Each edge is set independently: Free (broken plate), Clamped, '
+            'Pinned, Mirror, Periodic, or No outside loads (gFlex auto-pads '
+            'that edge and crops transparently).</p>'
             '<h3>Requirements</h3>'
             '<p>gFlex &ge; 2.0.0: <code>pip install gflex</code></p>'
         )
