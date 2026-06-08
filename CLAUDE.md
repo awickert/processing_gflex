@@ -70,23 +70,27 @@ flex.finalize()
 
 ### BC strings (v2.0 — all lowercase)
 
-| String | Alias | Physical meaning |
-|--------|-------|-----------------|
-| `"zero_displacement_zero_slope"` | `"clamped"` | Clamped end |
-| `"zero_displacement_zero_moment"` | `"pinned"` | Simply supported (pinned) |
-| `"zero_moment_zero_shear"` | `"free"` | Broken plate / free end |
-| `"zero_slope_zero_shear"` | `"mirror"` | Mirror symmetry plane |
-| `"periodic"` | — | Wrap-around |
+| String | Alias | Methods | Physical meaning |
+|--------|-------|---------|-----------------|
+| `"zero_displacement_zero_slope"` | `"clamped"` | FD | Clamped end |
+| `"zero_displacement_zero_moment"` | `"pinned"` | FD | Simply supported (pinned) |
+| `"zero_moment_zero_shear"` | `"free"` | FD | Broken plate / free end |
+| `"zero_slope_zero_shear"` | `"mirror"` | FD | Mirror symmetry plane |
+| `"periodic"` | — | FD, FFT | Wrap-around |
+| `"no_outside_loads"` | — | FD, FFT, SAS | Infinite plate, no far-field loads |
 
-For SAS/FFT solvers with no FD boundary: `"no_outside_loads"` (or leave unset).
+**`no_outside_loads` behaviour by method:**
+- **FD**: set on any subset of edges; gFlex auto-pads those sides by one flexural wavelength, applies clamped BC at the new outer edge, solves, and crops `w` back to the original shape. Output shape is transparent to the caller. Mixed BCs are supported (e.g. `no_outside_loads` on two sides, `free` on the others).
+- **FFT**: any non-`periodic` value (including `no_outside_loads` or unset) causes gFlex to zero-pad that axis. West/East and North/South pairs are controlled independently — mixed-axis configs (e.g. x-periodic, y-padded) are valid.
+- **SAS**: the default; leave BCs unset or set explicitly.
+
+**FFT per-axis BC rule**: set *both* sides of a pair to `"periodic"` for exact periodicity on that axis; if only one side is `"periodic"` gFlex warns and falls back to zero-padding.
 
 Old v1.x PascalCase strings (`"0Displacement0Slope"`, `"0Moment0Shear"`, etc.)
 now raise `ValueError`. Do not use them.
 
-Validated sets are available for programmatic use:
-```python
-gflex.VALID_BC_STRINGS_2D  # frozenset of all valid 2-D BC strings
-```
+`gflex.VALID_BC_STRINGS_2D` does **not** include `"no_outside_loads"` — it is
+handled as a special sentinel by the solver, not by the BC validator.
 
 ### Load array convention
 
