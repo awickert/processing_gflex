@@ -108,20 +108,6 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-        # ── FFT boundary conditions (per opposite-edge pair) ──────────────────
-        for param_key, label in [
-            (self.BC_FFT_EW, 'FFT boundary — West/East'),
-            (self.BC_FFT_NS, 'FFT boundary — North/South'),
-        ]:
-            self.addParameter(
-                QgsProcessingParameterEnum(
-                    param_key,
-                    label,
-                    options=_FFT_AXIS_LABELS,
-                    defaultValue=0,  # no outside loads
-                )
-            )
-
         # ── FD boundary conditions (one per edge) ─────────────────────────────
         for param_key, label in [
             (self.BC_NORTH, 'FD boundary — North'),
@@ -138,10 +124,24 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                 )
             )
 
+        # ── FFT boundary conditions (per opposite-edge pair) ──────────────────
+        for param_key, label in [
+            (self.BC_FFT_EW, 'FFT boundary — West/East'),
+            (self.BC_FFT_NS, 'FFT boundary — North/South'),
+        ]:
+            self.addParameter(
+                QgsProcessingParameterEnum(
+                    param_key,
+                    label,
+                    options=_FFT_AXIS_LABELS,
+                    defaultValue=0,  # no outside loads
+                )
+            )
+
         # ── Material properties (advanced) ────────────────────────────────────
         for param_key, label, default in [
             (self.PARAM_G,       'Gravitational acceleration [m/s²]',    9.8),
-            (self.PARAM_E,       "Young's modulus [Pa]",                  65e9),
+            (self.PARAM_E,       "Young's modulus E [Pa]",                 65e9),
             (self.PARAM_NU,      "Poisson's ratio",                       0.25),
             (self.PARAM_RHO_M,   'Mantle density [kg/m³]',               3300.0),
             (self.PARAM_RHO_FILL,'Infill density [kg/m³] (0 = air)',     0.0),
@@ -159,7 +159,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterRasterDestination(
                 self.OUTPUT,
-                'Flexural deflection [m]',
+                'Vertical deflection [m]',
             )
         )
 
