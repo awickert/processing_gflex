@@ -24,7 +24,7 @@ _BC_LABELS = [
     'Pinned (simply supported)',
     'Mirror symmetry',
     'Periodic',
-    'No outside loads (auto-pad this edge)',
+    'Infinite plate (auto-pad this edge)',
 ]
 
 _METHOD_KEYS = ['fd', 'fft', 'sas']
@@ -38,7 +38,7 @@ _METHOD_LABELS = [
 # 'periodic' → that axis wraps exactly; anything else → gFlex zero-pads that axis.
 _FFT_AXIS_KEYS = ['no_outside_loads', 'periodic']
 _FFT_AXIS_LABELS = [
-    'No outside loads — zero-pad this axis (recommended)',
+    'Infinite plate — zero-pad this axis (recommended)',
     'Periodic — domain wraps along this axis',
 ]
 
@@ -380,13 +380,13 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             '</ul>'
             '<h3>FFT boundaries</h3>'
             '<p>West/East and North/South are controlled independently. '
-            '<i>No outside loads</i> (recommended): gFlex zero-pads that axis '
+            '<i>Infinite plate</i> (recommended): gFlex zero-pads that axis '
             'internally and trims the output back to the original extent. '
             '<i>Periodic</i>: the domain wraps exactly along that axis. '
             'Mixed configurations (e.g. x-periodic, y-padded) are valid.</p>'
             '<h3>FD boundary conditions</h3>'
             '<p>Each edge is set independently: Free (broken plate), Clamped, '
-            'Pinned, Mirror, Periodic, or No outside loads (gFlex auto-pads '
+            'Pinned, Mirror, Periodic, or Infinite plate (gFlex auto-pads '
             'that edge and crops transparently).</p>'
             '<h3>Requirements</h3>'
             '<p>gFlex &ge; 2.0.0: <code>pip install gflex</code></p>'
