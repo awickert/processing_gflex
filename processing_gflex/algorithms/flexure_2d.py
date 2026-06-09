@@ -338,6 +338,32 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                     'FFT boundary settings are ignored for the SAS method.'
                 )
 
+        # ── FD memory warning ────────────────────────────────────────────────
+        # Each 'infinite' edge pads the domain by one flexural wavelength.
+        # For large grids or high Te this can easily require several GB of RAM.
+        if method == 'fd':
+            try:
+                _te_max = float(np.max(flex.T_e)) if not np.isscalar(flex.T_e) else float(flex.T_e)
+                _r = gflex.flexural_wavelengths(
+                    Te=_te_max, rho_m=flex.rho_m, rho_fill=flex.rho_fill,
+                    E=flex.E, nu=flex.nu, g=flex.g,
+                )
+                _pad = int(np.ceil(_r['lambda_2D'] / min(flex.dx, flex.dy)))
+                _inf = ('infinite', 'no_outside_loads')
+                _pad_ns = sum(1 for b in (flex.bc_north, flex.bc_south) if b in _inf)
+                _pad_ew = sum(1 for b in (flex.bc_west,  flex.bc_east)  if b in _inf)
+                _est_cells = (rows + _pad * _pad_ns) * (cols + _pad * _pad_ew)
+                if _est_cells > 500_000:
+                    feedback.pushWarning(
+                        f'FD with infinite boundary conditions will auto-pad the domain '
+                        f'by ~{_pad} cells per infinite edge. '
+                        f'Estimated padded domain: ~{_est_cells:,} cells — '
+                        f'this may require several GB of RAM. '
+                        f'Consider using FFT for large grids.'
+                    )
+            except Exception:
+                pass  # don't block the solve if the estimate fails
+
         # ── Solve ─────────────────────────────────────────────────────────────
         feedback.pushInfo('Computing deflections…')
         try:
