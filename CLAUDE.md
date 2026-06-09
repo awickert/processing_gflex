@@ -14,7 +14,7 @@ and in the QGIS Graphical Modeler.
 
 ---
 
-## gFlex v2.0.0b1 API (what this plugin calls)
+## gFlex API (v2.0.0b1+, what this plugin calls)
 
 ### Minimal 2-D FD workflow
 
@@ -25,7 +25,7 @@ import gflex
 flex = gflex.F2D()
 
 flex.method = 'fd'          # 'fd', 'fft', 'sas', 'sas_ng'
-flex.quiet = True
+flex.quiet = True           # now the default; explicit here for clarity
 
 flex.g = 9.8
 flex.E = 65e9
@@ -89,8 +89,8 @@ flex.finalize()
 Old v1.x PascalCase strings (`"0Displacement0Slope"`, `"0Moment0Shear"`, etc.)
 now raise `ValueError`. Do not use them.
 
-`gflex.VALID_BC_STRINGS_2D` does **not** include `"no_outside_loads"` — it is
-handled as a special sentinel by the solver, not by the BC validator.
+`gflex.VALID_BC_STRINGS_2D` now includes both `"no_outside_loads"` and `"infinite"`
+(added post-2.0.0b1).
 
 ### Load array convention
 
@@ -136,7 +136,7 @@ Suggested initial algorithm inputs:
   - `processing_gflex/__init__.py` — plugin entry point
   - `processing_gflex/provider.py` — `GFlexProvider(QgsProcessingProvider)`
   - `processing_gflex/algorithms/flexure_2d.py` — `Flexure2DAlgorithm`
-  - `metadata.txt` — QGIS plugin metadata (display name: `gFlex`)
+  - `processing_gflex/metadata.txt` — QGIS plugin metadata (display name: `gFlex`; must live beside `__init__.py`)
 - Display name in `metadata.txt`: `gFlex` (preserves branding)
 - Repo name is all-lowercase (`processing_gflex`) — Pythonic, consistent with
   import and eventual PyPI package name.
