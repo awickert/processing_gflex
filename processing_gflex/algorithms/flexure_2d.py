@@ -89,8 +89,8 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterString(
                 self.INPUT_TE,
-                'Elastic thickness — number or raster layer name',
-                defaultValue='35',
+                'Elastic thickness — number [m or km] or raster layer name',
+                defaultValue='35000',
             )
         )
         self.addParameter(
@@ -98,7 +98,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                 self.TE_UNITS,
                 'Elastic thickness units',
                 options=['m', 'km'],
-                defaultValue=1,  # km
+                defaultValue=0,  # m — rasters are almost always in SI units
             )
         )
 
