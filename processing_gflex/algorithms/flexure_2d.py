@@ -120,7 +120,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                     param_key,
                     label,
                     options=_BC_LABELS,
-                    defaultValue=0,  # free
+                    defaultValue=5,  # infinite
                 )
             )
 
@@ -281,7 +281,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             self.parameterAsEnum(parameters, k, context)
             for k in (self.BC_NORTH, self.BC_SOUTH, self.BC_WEST, self.BC_EAST)
         ]
-        fd_bcs_nondefault = any(i != 0 for i in fd_bc_indices)
+        fd_bcs_nondefault = any(i != 5 for i in fd_bc_indices)
 
         fft_ew = _FFT_AXIS_KEYS[self.parameterAsEnum(parameters, self.BC_FFT_EW, context)]
         fft_ns = _FFT_AXIS_KEYS[self.parameterAsEnum(parameters, self.BC_FFT_NS, context)]
