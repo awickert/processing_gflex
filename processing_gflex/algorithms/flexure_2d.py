@@ -331,7 +331,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                 )
 
         # ── Solve ─────────────────────────────────────────────────────────────
-        feedback.pushInfo('Computing flexural deflections…')
+        feedback.pushInfo('Computing deflections…')
         try:
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always')
@@ -368,10 +368,10 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         return '2D Flexural Isostasy'
 
     def group(self):
-        return 'gFlex'
+        return ''
 
     def groupId(self):
-        return 'gflex'
+        return ''
 
     def shortHelpString(self):
         return (
