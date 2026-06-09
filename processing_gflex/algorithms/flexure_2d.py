@@ -318,12 +318,15 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
 
         # ── Solve ─────────────────────────────────────────────────────────────
         feedback.pushInfo('Computing flexural deflections…')
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter('always')
-            flex.initialize()
-            flex.run()
-            w = flex.w.copy()   # copy before finalize() deletes flex.w
-            flex.finalize()
+        try:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter('always')
+                flex.initialize()
+                flex.run()
+                w = flex.w.copy()   # copy before finalize() deletes flex.w
+                flex.finalize()
+        except ValueError as exc:
+            raise QgsProcessingException(str(exc)) from exc
         for warninfo in caught:
             feedback.pushWarning(str(warninfo.message))
         feedback.pushInfo('Done.')
