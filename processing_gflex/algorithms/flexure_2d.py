@@ -61,10 +61,11 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
     PARAM_NU       = 'PARAM_NU'
     PARAM_RHO_M    = 'PARAM_RHO_M'
     PARAM_RHO_FILL = 'PARAM_RHO_FILL'
-    PARAM_SIGMA_XX = 'PARAM_SIGMA_XX'
-    PARAM_SIGMA_YY = 'PARAM_SIGMA_YY'
-    PARAM_SIGMA_XY = 'PARAM_SIGMA_XY'
-    OUTPUT         = 'OUTPUT'
+    PARAM_SIGMA_XX    = 'PARAM_SIGMA_XX'
+    PARAM_SIGMA_YY    = 'PARAM_SIGMA_YY'
+    PARAM_SIGMA_XY    = 'PARAM_SIGMA_XY'
+    PARAM_FFT_PAD_N   = 'PARAM_FFT_PAD_N'
+    OUTPUT            = 'OUTPUT'
 
     def initAlgorithm(self, config=None):
         # ── Load ──────────────────────────────────────────────────────────────
@@ -74,15 +75,15 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                 'Load raster (stress [Pa], or thickness [m] if density is set)',
             )
         )
-        p = QgsProcessingParameterNumber(
-            self.LOAD_DENSITY,
-            'Load density [kg/m³]  (0 = raster is already a stress [Pa])',
-            type=QgsProcessingParameterNumber.Double,
-            defaultValue=0.0,
-            minValue=0.0,
+        self.addParameter(
+            QgsProcessingParameterNumber(
+                self.LOAD_DENSITY,
+                'Load density [kg/m³]  (0 = raster is already a stress [Pa])',
+                type=QgsProcessingParameterNumber.Double,
+                defaultValue=0.0,
+                minValue=0.0,
+            )
         )
-        p.setFlags(p.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
-        self.addParameter(p)
 
         # ── Elastic thickness ─────────────────────────────────────────────────
         self.addParameter(
@@ -151,6 +152,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             (self.PARAM_SIGMA_XX, 'In-plane normal stress σ_xx [MPa] (FD/FFT)',    0.0),
             (self.PARAM_SIGMA_YY, 'In-plane normal stress σ_yy [MPa] (FD/FFT)',    0.0),
             (self.PARAM_SIGMA_XY, 'In-plane shear stress σ_xy [MPa] (FD/FFT)',     0.0),
+            (self.PARAM_FFT_PAD_N, 'FFT padding width [× flexural parameter α]',   4.0),
         ]:
             p = QgsProcessingParameterNumber(
                 param_key,
@@ -281,9 +283,15 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         flex.nu       = self.parameterAsDouble(parameters, self.PARAM_NU,      context)
         flex.rho_m    = self.parameterAsDouble(parameters, self.PARAM_RHO_M,   context)
         flex.rho_fill = self.parameterAsDouble(parameters, self.PARAM_RHO_FILL, context)
-        flex.sigma_xx = self.parameterAsDouble(parameters, self.PARAM_SIGMA_XX, context) * 1e6
-        flex.sigma_yy = self.parameterAsDouble(parameters, self.PARAM_SIGMA_YY, context) * 1e6
-        flex.sigma_xy = self.parameterAsDouble(parameters, self.PARAM_SIGMA_XY, context) * 1e6
+        flex.sigma_xx      = self.parameterAsDouble(parameters, self.PARAM_SIGMA_XX, context) * 1e6
+        flex.sigma_yy      = self.parameterAsDouble(parameters, self.PARAM_SIGMA_YY, context) * 1e6
+        flex.sigma_xy      = self.parameterAsDouble(parameters, self.PARAM_SIGMA_XY, context) * 1e6
+        fft_pad_n          = self.parameterAsDouble(parameters, self.PARAM_FFT_PAD_N, context)
+        flex.fft_pad_n_alpha = fft_pad_n
+        if method != 'fft' and fft_pad_n != 4.0:
+            feedback.pushWarning(
+                'FFT padding width is only used with the FFT method and will be ignored.'
+            )
 
         if method == 'sas' and (flex.sigma_xx or flex.sigma_yy or flex.sigma_xy):
             feedback.pushWarning(
