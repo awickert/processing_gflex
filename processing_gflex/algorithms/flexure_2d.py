@@ -141,7 +141,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         # ── Material properties (advanced) ────────────────────────────────────
         for param_key, label, default in [
             (self.PARAM_G,       'Gravitational acceleration [m/s²]',    9.8),
-            (self.PARAM_E,       "Young's modulus E [Pa]",                 65e9),
+            (self.PARAM_E,       "Young's modulus E [GPa]",                65.0),
             (self.PARAM_NU,      "Poisson's ratio",                       0.25),
             (self.PARAM_RHO_M,   'Mantle density [kg/m³]',               3300.0),
             (self.PARAM_RHO_FILL,'Infill density [kg/m³] (0 = air)',     0.0),
@@ -271,7 +271,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         flex.dx       = dx
         flex.dy       = dy
         flex.g        = g
-        flex.E        = self.parameterAsDouble(parameters, self.PARAM_E,       context)
+        flex.E        = self.parameterAsDouble(parameters, self.PARAM_E,       context) * 1e9
         flex.nu       = self.parameterAsDouble(parameters, self.PARAM_NU,      context)
         flex.rho_m    = self.parameterAsDouble(parameters, self.PARAM_RHO_M,   context)
         flex.rho_fill = self.parameterAsDouble(parameters, self.PARAM_RHO_FILL, context)
