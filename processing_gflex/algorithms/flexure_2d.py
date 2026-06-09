@@ -56,12 +56,15 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
     BC_SOUTH     = 'BC_SOUTH'
     BC_WEST      = 'BC_WEST'
     BC_EAST      = 'BC_EAST'
-    PARAM_G      = 'PARAM_G'
-    PARAM_E      = 'PARAM_E'
-    PARAM_NU     = 'PARAM_NU'
-    PARAM_RHO_M  = 'PARAM_RHO_M'
+    PARAM_G        = 'PARAM_G'
+    PARAM_E        = 'PARAM_E'
+    PARAM_NU       = 'PARAM_NU'
+    PARAM_RHO_M    = 'PARAM_RHO_M'
     PARAM_RHO_FILL = 'PARAM_RHO_FILL'
-    OUTPUT       = 'OUTPUT'
+    PARAM_SIGMA_XX = 'PARAM_SIGMA_XX'
+    PARAM_SIGMA_YY = 'PARAM_SIGMA_YY'
+    PARAM_SIGMA_XY = 'PARAM_SIGMA_XY'
+    OUTPUT         = 'OUTPUT'
 
     def initAlgorithm(self, config=None):
         # ── Load ──────────────────────────────────────────────────────────────
@@ -140,11 +143,14 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
 
         # ── Material properties (advanced) ────────────────────────────────────
         for param_key, label, default in [
-            (self.PARAM_G,       'Gravitational acceleration [m/s²]',    9.8),
-            (self.PARAM_E,       "Young's modulus E [GPa]",                65.0),
-            (self.PARAM_NU,      "Poisson's ratio",                       0.25),
-            (self.PARAM_RHO_M,   'Mantle density [kg/m³]',               3300.0),
-            (self.PARAM_RHO_FILL,'Infill density [kg/m³] (0 = air)',     0.0),
+            (self.PARAM_G,        'Gravitational acceleration [m/s²]',              9.8),
+            (self.PARAM_E,        "Young's modulus E [GPa]",                        65.0),
+            (self.PARAM_NU,       "Poisson's ratio",                                0.25),
+            (self.PARAM_RHO_M,    'Mantle density [kg/m³]',                        3300.0),
+            (self.PARAM_RHO_FILL, 'Infill density [kg/m³] (0 = air)',              0.0),
+            (self.PARAM_SIGMA_XX, 'In-plane normal stress σ_xx [MPa] (FD/FFT)',    0.0),
+            (self.PARAM_SIGMA_YY, 'In-plane normal stress σ_yy [MPa] (FD/FFT)',    0.0),
+            (self.PARAM_SIGMA_XY, 'In-plane shear stress σ_xy [MPa] (FD/FFT)',     0.0),
         ]:
             p = QgsProcessingParameterNumber(
                 param_key,
@@ -275,6 +281,14 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         flex.nu       = self.parameterAsDouble(parameters, self.PARAM_NU,      context)
         flex.rho_m    = self.parameterAsDouble(parameters, self.PARAM_RHO_M,   context)
         flex.rho_fill = self.parameterAsDouble(parameters, self.PARAM_RHO_FILL, context)
+        flex.sigma_xx = self.parameterAsDouble(parameters, self.PARAM_SIGMA_XX, context) * 1e6
+        flex.sigma_yy = self.parameterAsDouble(parameters, self.PARAM_SIGMA_YY, context) * 1e6
+        flex.sigma_xy = self.parameterAsDouble(parameters, self.PARAM_SIGMA_XY, context) * 1e6
+
+        if method == 'sas' and (flex.sigma_xx or flex.sigma_yy or flex.sigma_xy):
+            feedback.pushWarning(
+                'In-plane stresses are ignored by the SAS method.'
+            )
 
         # ── Boundary conditions ───────────────────────────────────────────────
         fd_bc_indices = [
