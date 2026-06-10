@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "processing_gflex: QGIS Processing plugin for lithospheric flexural isostasy"
+version: 0.1.0
+date-released: "2026-06-09"
+authors:
+  - family-names: Wickert
+    given-names: Andrew D.
+    orcid: https://orcid.org/0000-0001-6401-6297
+    affiliation: University of Minnesota
+repository-code: https://github.com/awickert/processing_gflex
+license: GPL-3.0
+references:
+  - type: article
+    title: "Open-source modular solutions for flexural isostasy: gFlex v1.0"
+    authors:
+      - family-names: Wickert
+        given-names: Andrew D.
+    journal: "Geoscientific Model Development"
+    volume: 9
+    issue: 3
+    start: 997
+    end: 1017
+    year: 2016
+    doi: 10.5194/gmd-9-997-2016
