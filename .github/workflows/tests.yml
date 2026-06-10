@@ -1,0 +1,26 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: qgis/qgis:latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python dependencies
+        run: python3 -m pip install gflex pytest
+
+      - name: Run tests
+        run: python3 -m pytest tests/ -v
+        env:
+          PROJ_DATA: /usr/share/proj
+          QGIS_PREFIX_PATH: /usr
+          QT_QPA_PLATFORM: offscreen

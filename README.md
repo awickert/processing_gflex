@@ -1,5 +1,7 @@
 # processing_gflex
 
+[![Tests](https://github.com/awickert/processing_gflex/actions/workflows/tests.yml/badge.svg)](https://github.com/awickert/processing_gflex/actions/workflows/tests.yml)
+
 A [QGIS](https://qgis.org) Processing provider plugin that computes
 **2-D lithospheric flexural isostasy** using the
 [gFlex](https://github.com/awickert/gFlex) library.
