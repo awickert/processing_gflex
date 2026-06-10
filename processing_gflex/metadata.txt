@@ -18,3 +18,11 @@ icon=icons/icon.png
 experimental=True
 deprecated=False
 hasProcessingProvider=yes
+changelog=0.1.0 - Initial release
+    2-D flexural isostasy via FD, FFT, and SAS methods
+    Variable or scalar elastic thickness (Te)
+    Independent boundary conditions per edge for FD; per-axis pair for FFT
+    In-plane stresses (sigma_xx, sigma_yy, sigma_xy) for FD and FFT
+    Auto-install gFlex >= 2.0.0 via pip if not present
+    Pre-run validation and memory warning for large FD domains
+    Progress reporting and cancellation support
