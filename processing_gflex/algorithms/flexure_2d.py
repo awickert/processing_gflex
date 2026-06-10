@@ -446,8 +446,8 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         out_ds.SetGeoTransform(geotransform)
         out_ds.SetProjection(projection)
         out_band = out_ds.GetRasterBand(1)
+        out_band.SetNoDataValue(-9999.0)   # must precede WriteArray
         out_band.WriteArray(w)
-        out_band.SetNoDataValue(float('nan'))
         out_ds.FlushCache()
         out_ds = None
         feedback.setProgress(100)
