@@ -23,6 +23,7 @@ about=Computes 2-D lithospheric flexural isostasy using the gFlex library.
 
       gFlex >= 2.0.0 is required and is installed automatically from PyPI on
       first use if not already present.
+      gFlex documentation: https://gflex.readthedocs.io
 tracker=https://github.com/awickert/processing_gflex/issues
 repository=https://github.com/awickert/processing_gflex
 tags=geophysics, flexure, isostasy, raster, lithosphere
