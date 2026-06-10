@@ -16,7 +16,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Python dependencies
-        run: python3 -m pip install --break-system-packages --pre 'gflex>=2.0.0b1' pytest
+        # gflex 2.0.0b1 (latest PyPI pre-release) lacks the 'infinite' BC alias
+        # and has a bc_west AttributeError bug; install from git until 2.0.0 final.
+        run: python3 -m pip install --break-system-packages 'git+https://github.com/awickert/gFlex.git' pytest
 
       - name: Run tests
         run: python3 -m pytest tests/ -v --tb=short -s

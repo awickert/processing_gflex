@@ -215,7 +215,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                 import subprocess, sys, importlib
                 subprocess.check_call(
                     [sys.executable, '-m', 'pip', 'install', '--user',
-                     '--pre', 'gflex>=2.0.0b1'],
+                     'git+https://github.com/awickert/gFlex.git'],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 )
                 if 'gflex' in sys.modules:
@@ -226,7 +226,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                 raise QgsProcessingException(
                     'gFlex >= 2.0.0 is not installed and automatic installation '
                     'failed.\nInstall manually with:\n'
-                    '  pip install --pre gflex\n'
+                    '  pip install git+https://github.com/awickert/gFlex.git\n'
                     'or see https://github.com/awickert/gFlex'
                 )
 
