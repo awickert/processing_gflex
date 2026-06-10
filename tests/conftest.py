@@ -8,8 +8,12 @@ Central point load of 1e6 Pa; Te = 10 km (small, to keep FD padding cheap).
 import os
 import sys
 
+import pytest
+
 # QGIS cleanup segfaults on exit in headless mode.  Bypassing Python teardown
 # with os._exit() avoids the segfault propagating as a non-zero exit code in CI.
+# trylast=True ensures pytest's terminal reporter prints failure details first.
+@pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
     os._exit(int(exitstatus))
 
