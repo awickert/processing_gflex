@@ -172,15 +172,27 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         )
 
     def processAlgorithm(self, parameters, context, feedback):
-        # ── Check gFlex ───────────────────────────────────────────────────────
+        # ── Check gFlex — auto-install if missing ─────────────────────────────
         try:
             import gflex
         except ImportError:
-            raise QgsProcessingException(
-                'Cannot import gFlex. Install with:\n'
-                '  pip install gflex\n'
-                'or see https://github.com/awickert/gFlex'
-            )
+            feedback.pushInfo('gFlex not found — attempting pip install…')
+            try:
+                import subprocess, sys
+                subprocess.check_call(
+                    [sys.executable, '-m', 'pip', 'install', '--user',
+                     'gflex>=2.0.0'],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
+                import gflex
+                feedback.pushInfo(f'gFlex {gflex.__version__} installed.')
+            except Exception:
+                raise QgsProcessingException(
+                    'gFlex is not installed and automatic installation failed.\n'
+                    'Install manually with:\n'
+                    '  pip install gflex\n'
+                    'or see https://github.com/awickert/gFlex'
+                )
 
         _ver = tuple(
             int(x.split('a')[0].split('b')[0].split('rc')[0])
