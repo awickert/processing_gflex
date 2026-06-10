@@ -5,10 +5,24 @@ description=Lithospheric flexural isostasy via gFlex
 version=0.1.0
 author=Andy Wickert
 email=awickert@umn.edu
-about=Exposes the gFlex lithospheric flexure model as QGIS Processing algorithms.
-      Computes 2-D flexural deflection of the lithosphere under surface loads
-      using finite difference, spectral (FFT), or analytical (SAS) methods.
-      Requires gFlex >= 2.0.0 (pip install gflex).
+about=Computes 2-D lithospheric flexural isostasy using the gFlex library.
+      Given a surface load raster (stress [Pa], or thickness [m] with a material
+      density) and an elastic thickness, the algorithm returns a raster of
+      vertical deflections of the lithosphere — negative values indicate
+      subsidence, positive values indicate forebulge uplift.
+
+      Three solution methods are available:
+        - Finite difference (FD): variable or scalar elastic thickness,
+          independent boundary conditions per edge, supports in-plane stresses
+        - Spectral / FFT: scalar elastic thickness, fast for large uniform grids
+        - Superposition of analytical solutions (SAS): scalar elastic thickness,
+          exact solution for distributed point/line loads
+
+      Typical applications include ice-sheet loading, sediment basin flexure,
+      volcanic island loading, and tectonic wedge problems.
+
+      gFlex >= 2.0.0 is required and is installed automatically from PyPI on
+      first use if not already present.
 tracker=https://github.com/awickert/processing_gflex/issues
 repository=https://github.com/awickert/processing_gflex
 tags=geophysics, flexure, isostasy, raster, lithosphere
