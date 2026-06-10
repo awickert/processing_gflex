@@ -13,7 +13,7 @@ jobs:
       image: qgis/qgis:latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
       - name: Install Python dependencies
         # gflex 2.0.0b1 (latest PyPI pre-release) lacks the 'infinite' BC alias
@@ -21,7 +21,7 @@ jobs:
         run: python3 -m pip install --break-system-packages 'git+https://github.com/awickert/gFlex.git' pytest
 
       - name: Run tests
-        run: python3 -m pytest tests/ -v --tb=short -s
+        run: python3 -m pytest tests/ -v --tb=short
         env:
           PROJ_DATA: /usr/share/proj
           QGIS_PREFIX_PATH: /usr
