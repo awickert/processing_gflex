@@ -203,7 +203,11 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                 f'Requires gFlex >= 2.0.0; installed: {gflex.__version__}'
             )
 
+        feedback.setProgress(5)
+
         # ── Read load raster ──────────────────────────────────────────────────
+        if feedback.isCanceled():
+            return {}
         load_layer = self.parameterAsRasterLayer(parameters, self.INPUT_LOAD, context)
         load_ds = gdal.Open(load_layer.source())
         if load_ds is None:
@@ -222,6 +226,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         if load_nodata is not None:
             load_array[np.isclose(load_array, load_nodata)] = 0.0
         load_ds = None
+        feedback.setProgress(20)
 
         # ── Surface load stress qs [Pa] ───────────────────────────────────────
         g            = self.parameterAsDouble(parameters, self.PARAM_G, context)
@@ -229,6 +234,8 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         qs = load_density * g * load_array if load_density > 0.0 else load_array
 
         # ── Elastic thickness ─────────────────────────────────────────────────
+        if feedback.isCanceled():
+            return {}
         te_units_idx = self.parameterAsEnum(parameters, self.TE_UNITS, context)
         te_scale     = 1000.0 if te_units_idx == 1 else 1.0  # km → m
 
@@ -251,6 +258,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             if te_nodata is not None:
                 T_e[np.isclose(te_raw, te_nodata)] = 0.0
             te_ds = None
+        feedback.setProgress(40)
 
         # ── Grid spacing [m] ──────────────────────────────────────────────────
         # geotransform: (x_min, dx, 0, y_max, 0, -dy)  (dy is negative)
@@ -377,11 +385,16 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
                 pass  # don't block the solve if the estimate fails
 
         # ── Solve ─────────────────────────────────────────────────────────────
+        if feedback.isCanceled():
+            return {}
+        feedback.setProgress(50)
         feedback.pushInfo('Computing deflections…')
         try:
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always')
                 flex.initialize()
+                if feedback.isCanceled():
+                    return {}
                 flex.run()
                 w = flex.w.copy()   # copy before finalize() deletes flex.w
                 flex.finalize()
@@ -389,9 +402,12 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             raise QgsProcessingException(str(exc)) from exc
         for warninfo in caught:
             feedback.pushWarning(str(warninfo.message))
+        feedback.setProgress(90)
         feedback.pushInfo('Done.')
 
         # ── Write output raster ───────────────────────────────────────────────
+        if feedback.isCanceled():
+            return {}
         output_path = self.parameterAsOutputLayer(parameters, self.OUTPUT, context)
         driver = gdal.GetDriverByName('GTiff')
         out_ds = driver.Create(output_path, cols, rows, 1, gdal.GDT_Float64)
@@ -402,6 +418,7 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         out_band.SetNoDataValue(float('nan'))
         out_ds.FlushCache()
         out_ds = None
+        feedback.setProgress(100)
 
         return {self.OUTPUT: output_path}
 
