@@ -171,6 +171,30 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
+    def checkParameterValues(self, parameters, context):
+        # rho_fill must be less than rho_m
+        rho_fill = self.parameterAsDouble(parameters, self.PARAM_RHO_FILL, context)
+        rho_m    = self.parameterAsDouble(parameters, self.PARAM_RHO_M,    context)
+        if rho_fill >= rho_m:
+            return False, (
+                f'Infill density ({rho_fill} kg/m³) must be less than '
+                f'mantle density ({rho_m} kg/m³).'
+            )
+
+        # FFT and SAS require a scalar Te
+        method = _METHOD_KEYS[self.parameterAsEnum(parameters, self.METHOD, context)]
+        if method in ('fft', 'sas'):
+            te_str = self.parameterAsString(parameters, self.INPUT_TE, context).strip()
+            try:
+                float(te_str)
+            except ValueError:
+                return False, (
+                    f'Method "{method}" requires a scalar elastic thickness. '
+                    'Enter a number for Te, or switch to the FD method.'
+                )
+
+        return super().checkParameterValues(parameters, context)
+
     def processAlgorithm(self, parameters, context, feedback):
         # ── Check gFlex — auto-install if missing ─────────────────────────────
         try:
