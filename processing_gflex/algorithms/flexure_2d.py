@@ -196,33 +196,41 @@ class Flexure2DAlgorithm(QgsProcessingAlgorithm):
         return super().checkParameterValues(parameters, context)
 
     def processAlgorithm(self, parameters, context, feedback):
-        # ── Check gFlex — auto-install if missing ─────────────────────────────
+        # ── Check gFlex — auto-install or upgrade if needed ───────────────────
+        def _gflex_ver(mod):
+            return tuple(
+                int(x.split('a')[0].split('b')[0].split('rc')[0])
+                for x in mod.__version__.split('.')[:3]
+            )
+
         try:
             import gflex
+            _needs_install = _gflex_ver(gflex) < (2, 0, 0)
         except ImportError:
-            feedback.pushInfo('gFlex not found — attempting pip install…')
+            _needs_install = True
+
+        if _needs_install:
+            feedback.pushInfo('gFlex >= 2.0.0 not found — attempting pip install…')
             try:
-                import subprocess, sys
+                import subprocess, sys, importlib
                 subprocess.check_call(
                     [sys.executable, '-m', 'pip', 'install', '--user',
-                     'gflex>=2.0.0'],
+                     '--pre', 'gflex>=2.0.0b1'],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 )
+                if 'gflex' in sys.modules:
+                    importlib.reload(sys.modules['gflex'])
                 import gflex
                 feedback.pushInfo(f'gFlex {gflex.__version__} installed.')
             except Exception:
                 raise QgsProcessingException(
-                    'gFlex is not installed and automatic installation failed.\n'
-                    'Install manually with:\n'
-                    '  pip install gflex\n'
+                    'gFlex >= 2.0.0 is not installed and automatic installation '
+                    'failed.\nInstall manually with:\n'
+                    '  pip install --pre gflex\n'
                     'or see https://github.com/awickert/gFlex'
                 )
 
-        _ver = tuple(
-            int(x.split('a')[0].split('b')[0].split('rc')[0])
-            for x in gflex.__version__.split('.')[:3]
-        )
-        if _ver < (2, 0, 0):
+        if _gflex_ver(gflex) < (2, 0, 0):
             raise QgsProcessingException(
                 f'Requires gFlex >= 2.0.0; installed: {gflex.__version__}'
             )
