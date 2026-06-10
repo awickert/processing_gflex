@@ -90,6 +90,24 @@ class TestCheckParameterValues:
         assert not ok
         assert 'scalar' in msg.lower() or 'fft' in msg.lower()
 
+    def test_sas_with_raster_te_rejected(self, load_layer, te_layer, tmp_dir):
+        """SAS method with a raster Te string must be caught before the solve."""
+        from processing_gflex.algorithms.flexure_2d import Flexure2DAlgorithm
+        from qgis.core import QgsProcessingContext
+
+        alg = Flexure2DAlgorithm()
+        alg.initAlgorithm()
+        params = {
+            'INPUT_LOAD': load_layer,
+            'INPUT_TE': te_layer.name(),
+            'TE_UNITS': 0, 'METHOD': 2,    # SAS
+            'PARAM_RHO_M': 3300.0, 'PARAM_RHO_FILL': 0.0,
+            'OUTPUT': str(tmp_dir / 'out.tif'),
+        }
+        ok, msg = alg.checkParameterValues(params, QgsProcessingContext())
+        assert not ok
+        assert 'scalar' in msg.lower() or 'sas' in msg.lower()
+
 
 # ---------------------------------------------------------------------------
 # Physical correctness
@@ -178,3 +196,59 @@ class TestPhysics:
         w_km = _run(load_layer, tmp_dir / 'te_km.tif',
                     INPUT_TE='10',    TE_UNITS=1, METHOD=1)
         np.testing.assert_allclose(w_m, w_km, rtol=1e-6)
+
+    def test_output_crs_and_geotransform(self, load_layer, tmp_dir):
+        """Output raster must preserve the CRS and geotransform of the input."""
+        from conftest import _GT, _EPSG
+        from osgeo import osr
+        out = tmp_dir / 'crs_check.tif'
+        _run(load_layer, out)
+        ds = gdal.Open(str(out))
+        assert ds.GetGeoTransform() == pytest.approx(_GT)
+        assert osr.SpatialReference(wkt=ds.GetProjection()).GetAuthorityCode(None) == str(_EPSG)
+        ds = None
+
+    def test_zero_load_zero_deflection(self, tmp_dir):
+        """An all-zero load raster must produce an all-zero deflection raster."""
+        from conftest import _NX, _NY, _write_tif
+        from qgis.core import QgsRasterLayer
+        zero_layer = QgsRasterLayer(
+            _write_tif(np.zeros((_NY, _NX)), tmp_dir / 'zero_load.tif'),
+            'zero_load',
+        )
+        # Use FD: the FFT solver has a known numerical issue with all-zero input.
+        w = _run(zero_layer, tmp_dir / 'zero_deflection.tif', METHOD=0)
+        np.testing.assert_allclose(w, 0.0, atol=1e-6)
+
+    def test_rho_fill_increases_deflection(self, load_layer, tmp_dir):
+        """Infill reduces the net restoring buoyancy (rho_m - rho_fill), so the plate
+        must deflect more with rho_fill > 0 than with rho_fill = 0 (air)."""
+        w_air   = _run(load_layer, tmp_dir / 'fill_air.tif',   METHOD=1, PARAM_RHO_FILL=0.0)
+        w_water = _run(load_layer, tmp_dir / 'fill_water.tif', METHOD=1, PARAM_RHO_FILL=1000.0)
+        cy, cx  = w_air.shape[0] // 2, w_air.shape[1] // 2
+        assert abs(w_water[cy, cx]) > abs(w_air[cy, cx])
+
+    def test_inplane_stress_changes_deflection(self, load_layer, tmp_dir):
+        """Non-zero sigma_xx must produce a different deflection field."""
+        w_0   = _run(load_layer, tmp_dir / 'sigma_0.tif',   METHOD=0, PARAM_SIGMA_XX=0.0)
+        w_100 = _run(load_layer, tmp_dir / 'sigma_100.tif', METHOD=0, PARAM_SIGMA_XX=100.0)
+        assert not np.allclose(w_0, w_100)
+
+    def test_forebulge_exists(self, load_layer, tmp_dir):
+        """Deflection must be positive (forebulge) somewhere in the grid away from the load."""
+        w = _run(load_layer, tmp_dir / 'forebulge.tif', METHOD=1)
+        assert np.any(w > 0)
+
+    def test_load_linearity(self, load_layer, tmp_dir):
+        """Doubling the load must double the deflection at the load centre."""
+        from conftest import _NX, _NY, _LOAD_PA, _write_tif
+        from qgis.core import QgsRasterLayer
+        qs2 = np.zeros((_NY, _NX))
+        qs2[_NY // 2, _NX // 2] = 2 * _LOAD_PA
+        double_layer = QgsRasterLayer(
+            _write_tif(qs2, tmp_dir / 'double_load.tif'), 'double_load'
+        )
+        w1 = _run(load_layer,   tmp_dir / 'linear_1x.tif', METHOD=1)
+        w2 = _run(double_layer, tmp_dir / 'linear_2x.tif', METHOD=1)
+        cy, cx = w1.shape[0] // 2, w1.shape[1] // 2
+        np.testing.assert_allclose(w2[cy, cx], 2 * w1[cy, cx], rtol=1e-4)

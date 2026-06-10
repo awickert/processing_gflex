@@ -56,8 +56,8 @@ def _write_tif(data: np.ndarray, path, nodata: float = -9999.0) -> str:
     ds.SetGeoTransform(_GT)
     ds.SetProjection(srs.ExportToWkt())
     band = ds.GetRasterBand(1)
+    band.SetNoDataValue(nodata)   # must precede WriteArray; GDAL fills unwritten tiles with NoData
     band.WriteArray(data.astype(np.float32))
-    band.SetNoDataValue(nodata)
     ds.FlushCache()
     ds = None
     return str(path)
