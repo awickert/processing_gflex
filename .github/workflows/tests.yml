@@ -19,7 +19,7 @@ jobs:
         run: python3 -m pip install --break-system-packages gflex pytest
 
       - name: Run tests
-        run: python3 -m pytest tests/ -v
+        run: python3 -m pytest tests/ -v --tb=short -s
         env:
           PROJ_DATA: /usr/share/proj
           QGIS_PREFIX_PATH: /usr
